@@ -19,8 +19,7 @@ logging.basicConfig(
 
 # Configure the Gemini API key
 gemini_api_key = os.environ.get("GEMINI_API_KEY")
-if not gemini_api_key:
-    raise ValueError("GEMINI_API_KEY environment variable not set.")
+
 genai.configure(api_key=gemini_api_key)
 
 @app.route("/stocks", methods=["GET"])
@@ -185,6 +184,8 @@ def analyze():
     from services.stock_service import get_stock_data, predict_next_close
     from services.news_service import get_company_news
     from services.sentiment_service import analyze_sentiment_with_gemini
+    if not gemini_api_key:
+    raise ValueError("GEMINI_API_KEY environment variable not set.")
 
     symbol = request.args.get("symbol", "GOOG")
     try:
