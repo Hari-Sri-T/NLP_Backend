@@ -20,10 +20,6 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 
-# Configure the Gemini API key
-gemini_api_key = os.environ.get("GEMINI_API_KEY")
-
-genai.configure(api_key=gemini_api_key)
 
 @app.route("/stocks", methods=["GET"])
 def get_stocks():
