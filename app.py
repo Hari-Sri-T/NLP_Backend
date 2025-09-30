@@ -4,9 +4,12 @@ from flask_cors import CORS
 import logging
 import yfinance as yf
 import pandas as pd
-import google.generativeai as genai
+
 from services.statistical_model import get_advanced_metrics
 from services.scoring import get_price_trend_score, get_valuation_score, combine_scores, map_to_recommendation
+
+import requests
+import json
 
 
 app = Flask(__name__)
@@ -108,85 +111,94 @@ def get_history():
         logging.error(f"Error fetching history for {symbol}: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
+# Helper function to make direct calls to the Gemini API
+def call_gemini_api(prompt):
+    gemini_api_key = os.environ.get("GEMINI_API_KEY")
+    if not gemini_api_key:
+        raise ValueError("GEMINI_API_KEY is not configured.")
 
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key={gemini_api_key}"
+    headers = {'Content-Type': 'application/json'}
+    data = {"contents": [{"parts": [{"text": prompt}]}]}
+
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status() # Raises an exception for bad status codes (4xx or 5xx)
+        
+        result = response.json()
+        return result['contents'][0]['parts'][0]['text'].strip()
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Gemini API request failed: {e}")
+        return None
+    except (KeyError, IndexError) as e:
+        logging.error(f"Failed to parse Gemini API response: {e} | Response: {response.text}")
+        return None
+
+# Replace your old analyze_sentiment_with_gemini function
+def analyze_sentiment_with_gemini(news_text: str) -> int:
+    if not news_text or not news_text.strip():
+        return 50
+
+    prompt = f"""
+    You are a financial analyst. Based on the following news, rate the sentiment for the stock on a scale of 0–100, where 0 = Strong Sell, 50 = Hold, 100 = Strong Buy. Only output the number.
+    News: {news_text}
+    """
+    response_text = call_gemini_api(prompt)
+    try:
+        score = int(response_text)
+        return max(0, min(100, score))
+    except (ValueError, TypeError):
+        logging.error(f"Could not parse sentiment score from Gemini response: {response_text}")
+        return 50
+
+# Replace your old summarize_news_with_llm function
 def summarize_news_with_llm(symbol, articles):
-    """
-    Summarize multiple news articles using a strict prompt that specifies the output format.
-    """
     if not articles:
         return "No significant news found."
-
-    # Format the news with clear separators for the AI
-    news_text = "\n\n---\n\n".join([f"Headline: {a['title']}\nSummary: {a.get('description', '')}" for a in articles if a.get('title')])
     
+    news_text = "\n\n---\n\n".join([f"Headline: {a['title']}\nSummary: {a.get('description', '')}" for a in articles if a.get('title')])
     if not news_text.strip():
         return "No news content available to summarize."
-
-    # This new prompt forces the AI to provide the news itself.
+        
     prompt = f"""
     You are a financial analyst. Your task is to create a concise, bullet-point summary of the most important financial news for the company '{symbol}' from the articles provided below.
+    - Identify articles *directly* about '{symbol}'s business or financial performance.
+    - Ignore irrelevant news (politics, other companies, etc.).
+    - Summarize key takeaways in this format: - **News Event:** [Event]. **Financial Implication:** [Effect].
+    - If no relevant news is found, respond with ONLY this sentence: "No significant company-specific news was found in the latest articles."
 
-    Follow these instructions:
-    1.  **Identify Relevant News:** First, read through all the articles and identify only the ones that are *directly* about '{symbol}'s business, products, or financial performance.
-    2.  **Discard Irrelevant News:** You must ignore articles about politics, executive lifestyles, or other companies unless they describe a direct partnership, competition, or event that financially impacts '{symbol}'.
-    3.  **Summarize Key Takeaways:** From the relevant articles you identify, extract and summarize the key takeaways.
-    4.  **Use This Exact Format:** Your output must be in bullet points, and each bullet point must follow this precise format:
-        - **News Event:** [Briefly state the specific news event]. **Financial Implication:** [Explain the potential financial effect].
-    5.  **Handle No News:** If you find NO directly relevant news for '{symbol}', you MUST respond with ONLY this exact sentence: "No significant company-specific news was found in the latest articles."
-
-    List of articles to analyze:
+    Articles to analyze:
     {news_text}
     """
+    summary = call_gemini_api(prompt)
+    return summary or "News summary could not be generated due to an API error."
 
-    try:
-        model = genai.GenerativeModel('gemini-flash-lite-latest')
-        response = model.generate_content(prompt)
-        return response.text.strip() or "Summary not available."
-    except Exception as e:
-        logging.error(f"News summarization with Gemini failed: {e}")
-        return "News summary could not be generated due to an API error."
-    
-    
-    
+# Replace your old generate_explanation function
 def generate_explanation(symbol, last_close, predicted_close, trend_score,
                          sentiment_score, final_score, recommendation, news_text):
-    """
-    Uses the Gemini API to explain reasoning in natural language.
-    """
-    prompt = f"""You are a stock analyst assistant.
-    Task: Explain in **3–5 sentences max** why the recommendation for {symbol} is "{recommendation}".
-    Only use the provided data:
-    - **Last Close Price:** ${last_close:.2f}
-    - **AI Predicted Next Close:** ${predicted_close:.2f}
-    - **Price Trend Score:** {trend_score}
-    - **News Sentiment Score:** {sentiment_score}
-    - **Final AI Score:** {final_score}
-    - **Key News Summary:** {news_text[:400]}
+    prompt = f"""
+    You are a stock analyst assistant. Explain in 3–5 sentences max why the recommendation for {symbol} is "{recommendation}".
+    Use only the provided data:
+    - Last Close Price: ${last_close:.2f}
+    - AI Predicted Next Close: ${predicted_close:.2f}
+    - Price Trend Score: {trend_score}
+    - News Sentiment Score: {sentiment_score}
+    - Final AI Score: {final_score}
+    - Key News Summary: {news_text[:400]}
 
-    **Rules:**
-    - Do NOT mention unrelated companies or cryptocurrencies.
-    - Do NOT invent extra details. Be factual and concise.
-    - Use simple, direct language.
-    - Present the explanation in a few clear bullet points.
-    - Stay focused on {symbol}.
+    Rules:
+    - Do NOT invent details. Be factual and concise.
+    - Use clear bullet points.
     """
-    try:
-        model = genai.GenerativeModel('gemini-flash-lite-latest')
-        response = model.generate_content(prompt)
-        return response.text.strip() or "Explanation not available."
-    except Exception as e:
-        logging.error(f"LLM explanation with Gemini failed: {e}")
-        return "Explanation not available due to an API error."
-
+    explanation = call_gemini_api(prompt)
+    return explanation or "Explanation not available due to an API error."
 
 @app.route("/analyze", methods=["GET"])
 def analyze():
     from services.stock_service import get_stock_data, predict_next_close
     from services.news_service import get_company_news
     from services.sentiment_service import analyze_sentiment_with_gemini
-    if not gemini_api_key:
-        raise ValueError("GEMINI_API_KEY environment variable not set.")
-
+   
     symbol = request.args.get("symbol", "GOOG")
     try:
         logging.info(f"--- Starting full analysis for {symbol} ---")
