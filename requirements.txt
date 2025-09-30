@@ -9,4 +9,10 @@ requests
 python-dotenv
 finnhub-python
 gunicorn
-google.generativeai
+google-generativeai==0.8.5
+google-api-python-client==2.183.0
+google-api-core==2.25.1
+google-auth==2.41.0
+grpcio==1.64.1
+grpcio-status==1.62.2
+protobuf==4.25.3
