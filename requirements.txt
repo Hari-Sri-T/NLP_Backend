@@ -1,0 +1,10 @@
+flask
+flask-cors
+tensorflow
+scikit-learn
+pandas
+numpy
+yfinance
+requests
+python-dotenv
+finnhub-python
