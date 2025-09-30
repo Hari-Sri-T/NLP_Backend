@@ -193,7 +193,6 @@ def generate_explanation(symbol, last_close, predicted_close, trend_score,
 def analyze():
     from services.stock_service import get_stock_data, predict_next_close
     from services.news_service import get_company_news
-    from services.sentiment_service import analyze_sentiment_with_gemini
    
     symbol = request.args.get("symbol", "GOOG")
     try:
