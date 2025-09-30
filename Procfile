@@ -1,1 +1,0 @@
-web: gunicorn --workers 4 --worker-tmp-dir /dev/shm --timeout 120 app:app
