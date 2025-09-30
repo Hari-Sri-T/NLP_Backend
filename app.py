@@ -185,7 +185,7 @@ def analyze():
     from services.news_service import get_company_news
     from services.sentiment_service import analyze_sentiment_with_gemini
     if not gemini_api_key:
-    raise ValueError("GEMINI_API_KEY environment variable not set.")
+        raise ValueError("GEMINI_API_KEY environment variable not set.")
 
     symbol = request.args.get("symbol", "GOOG")
     try:
