@@ -122,7 +122,10 @@ def call_gemini_api(prompt):
         response.raise_for_status() # Raises an exception for bad status codes (4xx or 5xx)
         
         result = response.json()
-        return result['contents'][0]['parts'][0]['text'].strip()
+        
+        # THE FIX IS HERE: The path to the text is different in the actual response
+        return result['candidates'][0]['content']['parts'][0]['text'].strip()
+
     except requests.exceptions.RequestException as e:
         logging.error(f"Gemini API request failed: {e}")
         return None
