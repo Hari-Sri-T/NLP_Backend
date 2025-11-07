@@ -17,15 +17,21 @@ import logging
 
 FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
 
+
 finnhub_client = None
 if FINNHUB_API_KEY:
     try:
         finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
-        # Test the connection with a simple, low-cost API call
-        finnhub_client.exchanges()
-        logging.info("Finnhub client initialized successfully.")
+        # Simple lightweight ping — doesn’t depend on a specific stock
+        test = finnhub_client.symbol_lookup("AAPL")
+        if "result" in test:
+            logging.info("✅ Finnhub client initialized successfully.")
+        else:
+            logging.warning("⚠️ Finnhub client initialized, but could not verify key.")
     except Exception as e:
         logging.error(f"Failed to initialize or validate Finnhub client with the provided API key: {e}")
+
+
 else:
     logging.error("CRITICAL: FINNHUB_API_KEY environment variable not set. The application cannot fetch stock data.")
 

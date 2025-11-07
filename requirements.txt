@@ -9,3 +9,6 @@ requests
 python-dotenv
 finnhub-python
 gunicorn
+flask-sqlalchemy
+flask-bcrypt
+flask-jwt-extended

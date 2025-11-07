@@ -5,7 +5,10 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow import keras
 
 # Load trained LSTM model
-model = keras.models.load_model("model/best_multivariate_lstm.keras")
+import os
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "model", "best_multivariate_lstm.keras")
+model = keras.models.load_model(os.path.abspath(MODEL_PATH))
+
 
 FEATURES = ["close", "open", "high", "low", "volume"]
 TIME_STEP = 60
