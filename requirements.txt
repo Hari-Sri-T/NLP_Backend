@@ -1,6 +1,6 @@
 flask
 flask-cors
-tensorflow
+tflite-runtime
 scikit-learn
 pandas
 numpy
