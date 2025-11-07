@@ -281,7 +281,7 @@ def analyze():
             raise ValueError(f"Could not retrieve stock data for {symbol}.") 
 
         last_close = float(df["close"].iloc[-1]) 
-        predicted_close = predict_next_close(df) 
+        predicted_close = predict_next_close(symbol) 
         trend_score = get_price_trend_score(predicted_close, last_close) 
 
         company_profile = get_company_logo(symbol, get_full_profile=True) 

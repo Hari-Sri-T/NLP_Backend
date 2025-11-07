@@ -1,6 +1,5 @@
 flask
 flask-cors
-tflite-runtime
 scikit-learn
 pandas
 numpy

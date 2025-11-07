@@ -1,12 +1,11 @@
 import yfinance as yf
 import numpy as np
 import pandas as pd
+
+import requests
+import logging
+
 from sklearn.preprocessing import MinMaxScaler
-# -----------------------------------------------------------------
-# REMOVED: from tensorflow import keras
-# ADDED: The TFLite interpreter
-import tflite_runtime.interpreter as tflite
-# -----------------------------------------------------------------
 import os
 
 # -----------------------------------------------------------------
@@ -42,40 +41,32 @@ def preprocess_data(df):
     X = scaled[-TIME_STEP:]
     return np.expand_dims(X, axis=0), scaler
 
-def predict_next_close(df):
+def predict_next_close(symbol):
     """
-    Uses the TFLITE model to predict next closing price.
-    (This function is UPDATED)
+    Calls the Hugging Face AI service to get the predicted close price.
+    Returns the predicted price as a float, or None if it fails.
     """
-    X, scaler = preprocess_data(df)
+    # This is the URL to your existing Hugging Face API endpoint
+    hf_url = "https://harisri-ai-stock-advisor.hf.space/predict"
     
-    # -----------------------------------------------------------------
-    # --- Start of TFLite Prediction ---
-    
-    # 1. Load the TFLite model
-    interpreter = tflite.Interpreter(model_path=os.path.abspath(TFLITE_MODEL_PATH))
-    interpreter.allocate_tensors()
-
-    # 2. Get input/output details
-    input_details = interpreter.get_input_details()
-    output_details = interpreter.get_output_details()
-
-    # 3. Set the input tensor (must be float32)
-    # The X from preprocess_data is (1, 60, 5), which is correct
-    interpreter.set_tensor(input_details[0]['index'], np.array(X, dtype=np.float32))
-
-    # 4. Run inference
-    interpreter.invoke()
-
-    # 5. Get the prediction
-    pred = interpreter.get_tensor(output_details[0]['index'])
-    
-    # --- End of TFLite Prediction ---
-    # -----------------------------------------------------------------
-    
-    # Inverse transform (this logic is the same as before)
-    dummy = np.zeros((1, len(FEATURES)))
-    dummy[:, 0] = pred.ravel()
-    predicted_close = scaler.inverse_transform(dummy)[:, 0][0]
-    
-    return float(predicted_close)
+    try:
+        # 30-second timeout to handle the HF Space waking up
+        response = requests.get(f"{hf_url}?symbol={symbol}", timeout=30)
+        
+        if response.status_code == 200:
+            prediction_data = response.json()
+            # Check if the key exists before returning
+            if "predicted_close" in prediction_data:
+                return float(prediction_data["predicted_close"])
+            else:
+                logging.warning(f"AI service response missing 'predicted_close' key: {prediction_data}")
+                return None
+        else:
+            # Log if the server didn't return 200 OK
+            logging.warning(f"AI service returned status {response.status_code}")
+            return None
+            
+    except requests.RequestException as e:
+        # If the HF space is asleep or fails, log the error
+        logging.error(f"AI service call failed: {e}")
+        return None
